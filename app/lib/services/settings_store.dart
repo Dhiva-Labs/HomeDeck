@@ -62,13 +62,35 @@ class SettingsStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ---- MQTT (used from Phase 5) ---------------------------------------------
+  // ---- MQTT -----------------------------------------------------------------
 
   String? get mqttBroker => _prefs.getString('mqttBroker');
   set mqttBroker(String? v) {
     v == null || v.isEmpty
         ? _prefs.remove('mqttBroker')
         : _prefs.setString('mqttBroker', v);
+    notifyListeners();
+  }
+
+  int get mqttPort => _prefs.getInt('mqttPort') ?? 1883;
+  set mqttPort(int v) {
+    _prefs.setInt('mqttPort', v);
+    notifyListeners();
+  }
+
+  String? get mqttUsername => _prefs.getString('mqttUsername');
+  set mqttUsername(String? v) {
+    v == null || v.isEmpty
+        ? _prefs.remove('mqttUsername')
+        : _prefs.setString('mqttUsername', v);
+    notifyListeners();
+  }
+
+  String? get mqttPassword => _prefs.getString('mqttPassword');
+  set mqttPassword(String? v) {
+    v == null || v.isEmpty
+        ? _prefs.remove('mqttPassword')
+        : _prefs.setString('mqttPassword', v);
     notifyListeners();
   }
 

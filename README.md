@@ -14,7 +14,7 @@ built to run well on hardware everyone else has given up on.
 | **Security cameras, any brand** | ONVIF WS-Discovery, or a manual RTSP/HTTP URL | Working |
 | **Analog cameras** | The DVR/encoder's RTSP channel, added manually | Working |
 | **Home Assistant** | mDNS autodetect, REST + WebSocket | Working |
-| **MQTT devices** (ESP32, Tasmota, Zigbee2MQTT) | Broker connection, HA-discovery + Homie topics | Planned |
+| **MQTT devices** (ESP32, Tasmota, Zigbee2MQTT, Shelly) | Broker connection, Home Assistant discovery topics | Working |
 | **Ancient devices** (pre-Android 5, old iPads) | Retro web dashboard served by the Go hub | Planned |
 
 Devices from every source are normalized into one `Device` model, so the
@@ -46,7 +46,7 @@ home_deck/
 ├── app/     Flutter app (Android + Linux)
 │   └── lib/
 │       ├── models/       Device, Camera
-│       ├── connectors/   netscan/, camera/, ha/  (one Connector interface per source)
+│       ├── connectors/   netscan/, camera/, ha/, mqtt/  (one Connector per source)
 │       ├── services/     device_registry, camera_store, settings_store, connectors_service
 │       ├── screens/      dashboard, devices, cameras, camera_view, settings, onboarding
 │       └── widgets/      device_tile, camera_tile, ptz_pad

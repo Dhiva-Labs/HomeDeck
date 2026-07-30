@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../connectors/ha/ha_connector.dart';
+import '../connectors/mqtt/mqtt_connector.dart';
 import '../services/device_registry.dart';
 import '../services/settings_store.dart';
 import 'ha_settings_screen.dart';
+import 'mqtt_settings_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -15,6 +17,7 @@ class SettingsScreen extends StatelessWidget {
     final settings = context.watch<SettingsStore>();
     final registry = context.watch<DeviceRegistry>();
     final ha = context.watch<HaConnector>();
+    final mqtt = context.watch<MqttConnector>();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -77,11 +80,19 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
           ),
-          const ListTile(
-            leading: Icon(Icons.hub_outlined),
-            title: Text('MQTT broker'),
-            subtitle: Text('Arrives in the MQTT build'),
-            enabled: false,
+          ListTile(
+            leading: const Icon(Icons.hub_outlined),
+            title: const Text('MQTT broker'),
+            subtitle: Text(mqtt.configured
+                ? (mqtt.statusMessage ?? mqtt.status.name)
+                : 'Not connected'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => const MqttSettingsScreen(),
+              ),
+            ),
           ),
           const ListTile(
             leading: Icon(Icons.dns_outlined),
