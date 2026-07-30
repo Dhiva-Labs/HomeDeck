@@ -15,7 +15,7 @@ built to run well on hardware everyone else has given up on.
 | **Analog cameras** | The DVR/encoder's RTSP channel, added manually | Working |
 | **Home Assistant** | mDNS autodetect, REST + WebSocket | Working |
 | **MQTT devices** (ESP32, Tasmota, Zigbee2MQTT, Shelly) | Broker connection, Home Assistant discovery topics | Working |
-| **Ancient devices** (pre-Android 5, old iPads) | Retro web dashboard served by the Go hub | Planned |
+| **Ancient devices** (pre-Android 5, old iPads) | Retro web dashboard served by the Go hub | Built, uncompiled |
 
 Devices from every source are normalized into one `Device` model, so the
 dashboard treats a Home Assistant light and a bare network host the same way:
@@ -33,8 +33,11 @@ built around that:
   the main one. On weak devices HomeDeck picks the small one automatically.
 - **Capped video surface.** In performance mode the decode target is capped at
   480p regardless of what the camera sends.
-- **Performance mode** strips animations, shadows, splashes and page
-  transitions.
+- **Performance mode decides for itself.** At startup the app reads RAM, CPU
+  cores and Android version and reduces effects when the hardware warrants it,
+  telling you in Settings what it chose and why.
+- **Overnight dimming** so a wall panel doesn't light the room; the first tap
+  wakes it without also toggling whatever was under your finger.
 - **Per-ABI APKs**, so a 32-bit device installs 29 MB instead of a fat
   universal build.
 - **Wakelock and panel mode** for always-on wall use.
@@ -46,11 +49,12 @@ home_deck/
 ├── app/     Flutter app (Android + Linux)
 │   └── lib/
 │       ├── models/       Device, Camera
-│       ├── connectors/   netscan/, camera/, ha/, mqtt/  (one Connector per source)
+│       ├── connectors/   netscan/, camera/, ha/, mqtt/, hub/  (one per source)
 │       ├── services/     device_registry, camera_store, settings_store, connectors_service
 │       ├── screens/      dashboard, devices, cameras, camera_view, settings, onboarding
 │       └── widgets/      device_tile, camera_tile, ptz_pad
-└── hub/     Go hub — planned
+└── hub/     Go hub: LAN scanner, Wake-on-LAN, ffmpeg MJPEG restreamer,
+              and the retro dashboard for devices Flutter can't target
 ```
 
 Connectors are the extension point: each one discovers devices, pushes them into
@@ -98,8 +102,19 @@ dart run tool/scan_probe.dart      # sweeps the subnet, prints live hosts
 dart run tool/camera_probe.dart    # ONVIF discovery; pass user pass to fetch streams
 ```
 
-## Known decisions to revisit
+See [docs/old-device-setup.md](docs/old-device-setup.md) for putting a panel on
+a wall, including launcher mode and the battery question.
+
+## Known gaps
 
 - **`minSdk`** in `app/android/app/build.gradle.kts` currently resolves to
   Flutter's default of 24 (Android 7.0). Supporting the Android 5–6 devices in
   scope needs `minSdk = 21` set explicitly there.
+- **The hub has never been compiled.** There is no Go toolchain on the machine
+  it was written on, so `go build` was not run and none of it has been
+  exercised against a live camera. The Dart side that talks to it is tested.
+- **The MQTT broker connection is untested** — no broker was available. Message
+  routing and payload parsing are covered end to end; the socket plumbing is
+  not.
+- **Linux desktop video** needs `sudo apt install libmpv-dev`, which could not
+  be installed here.

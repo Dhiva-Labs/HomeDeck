@@ -17,6 +17,7 @@ import 'services/connectors_service.dart';
 import 'services/device_registry.dart';
 import 'services/settings_store.dart';
 import 'theme.dart';
+import 'widgets/night_dimmer.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -99,7 +100,7 @@ class HomeDeckApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           theme: buildTheme(lowFx: settings.lowFx),
           home: settings.onboarded
-              ? const HomeShell()
+              ? const NightDimmer(child: HomeShell())
               : const OnboardingScreen(),
         ),
       ),

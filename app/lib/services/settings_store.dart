@@ -1,16 +1,29 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'device_capabilities.dart';
+
 enum PerformanceMode { auto, on, off }
+
+/// Whether [hour] falls in the window from [start] to [end], which wraps
+/// past midnight when start > end (23:00–06:00 being the normal case).
+bool isWithinDimWindow(int hour, int start, int end) =>
+    start <= end ? hour >= start && hour < end : hour >= start || hour < end;
 
 /// App settings backed by SharedPreferences. Loaded once at startup.
 class SettingsStore extends ChangeNotifier {
-  SettingsStore(this._prefs);
+  SettingsStore(this._prefs, this.capabilities);
 
   final SharedPreferences _prefs;
 
-  static Future<SettingsStore> load() async =>
-      SettingsStore(await SharedPreferences.getInstance());
+  /// What the hardware can handle, detected once at startup. Drives
+  /// [lowFx] when performance mode is left on `auto`.
+  final DeviceCapabilities capabilities;
+
+  static Future<SettingsStore> load() async => SettingsStore(
+        await SharedPreferences.getInstance(),
+        await DeviceCapabilities.detect(),
+      );
 
   // ---- Onboarding -----------------------------------------------------------
 
@@ -31,11 +44,10 @@ class SettingsStore extends ChangeNotifier {
   }
 
   /// Whether reduced-effects mode is in force right now.
-  /// In `auto`, Phase 7 adds device heuristics; until then auto == off.
   bool get lowFx => switch (performanceMode) {
         PerformanceMode.on => true,
         PerformanceMode.off => false,
-        PerformanceMode.auto => false,
+        PerformanceMode.auto => capabilities.isWeak,
       };
 
   // ---- Panel / kiosk --------------------------------------------------------
@@ -44,6 +56,31 @@ class SettingsStore extends ChangeNotifier {
   set keepScreenOn(bool v) {
     _prefs.setBool('keepScreenOn', v);
     notifyListeners();
+  }
+
+  /// Dim the panel overnight so a wall-mounted tablet isn't a nightlight.
+  bool get dimAtNight => _prefs.getBool('dimAtNight') ?? false;
+  set dimAtNight(bool v) {
+    _prefs.setBool('dimAtNight', v);
+    notifyListeners();
+  }
+
+  int get dimStartHour => _prefs.getInt('dimStartHour') ?? 23;
+  set dimStartHour(int v) {
+    _prefs.setInt('dimStartHour', v);
+    notifyListeners();
+  }
+
+  int get dimEndHour => _prefs.getInt('dimEndHour') ?? 6;
+  set dimEndHour(int v) {
+    _prefs.setInt('dimEndHour', v);
+    notifyListeners();
+  }
+
+  /// True when [now] falls inside the dim window, which may wrap midnight.
+  bool isDimHour(DateTime now) {
+    if (!dimAtNight) return false;
+    return isWithinDimWindow(now.hour, dimStartHour, dimEndHour);
   }
 
   // ---- Home Assistant (used from Phase 4) -----------------------------------

@@ -35,11 +35,52 @@ class SettingsScreen extends StatelessWidget {
               WakelockPlus.toggle(enable: v);
             },
           ),
+          SwitchListTile(
+            title: const Text('Dim overnight'),
+            subtitle: Text(settings.dimAtNight
+                ? 'Dims from ${settings.dimStartHour}:00 to '
+                    '${settings.dimEndHour}:00 — tap the screen to wake'
+                : 'Keeps a wall-mounted panel from lighting the room'),
+            value: settings.dimAtNight,
+            onChanged: (v) => settings.dimAtNight = v,
+          ),
+          if (settings.dimAtNight)
+            ListTile(
+              title: const Text('Dim window'),
+              subtitle: Row(
+                children: [
+                  Expanded(
+                    child: _HourPicker(
+                      label: 'From',
+                      hour: settings.dimStartHour,
+                      onChanged: (h) => settings.dimStartHour = h,
+                    ),
+                  ),
+                  Expanded(
+                    child: _HourPicker(
+                      label: 'To',
+                      hour: settings.dimEndHour,
+                      onChanged: (h) => settings.dimEndHour = h,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const Divider(),
+          const _SectionHeader('Performance'),
           ListTile(
             title: const Text('Performance mode'),
-            subtitle: const Text(
-                'Reduces animations and effects for old devices'),
-            trailing: SegmentedButton<PerformanceMode>(
+            subtitle: Text(
+              settings.performanceMode == PerformanceMode.auto
+                  ? 'Auto — ${settings.capabilities.reason}, so effects are '
+                      '${settings.lowFx ? 'reduced' : 'on'}'
+                  : 'Reduces animations and effects for old devices',
+            ),
+            isThreeLine: settings.performanceMode == PerformanceMode.auto,
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SegmentedButton<PerformanceMode>(
               segments: const [
                 ButtonSegment(
                     value: PerformanceMode.auto, label: Text('Auto')),
@@ -50,6 +91,17 @@ class SettingsScreen extends StatelessWidget {
               onSelectionChanged: (s) => settings.performanceMode = s.first,
             ),
           ),
+          if (settings.capabilities.totalRamMb != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Text(
+                'This device: '
+                '${(settings.capabilities.totalRamMb! / 1024).toStringAsFixed(1)} GB RAM, '
+                '${settings.capabilities.cpuCores} cores'
+                '${settings.capabilities.androidSdk != null ? ', API ${settings.capabilities.androidSdk}' : ''}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
           const Divider(),
           const _SectionHeader('Rooms'),
           for (final room in registry.rooms)
@@ -179,6 +231,31 @@ class SettingsScreen extends StatelessWidget {
     );
     if (name != null && name.isNotEmpty) registry.addRoom(name);
   }
+}
+
+class _HourPicker extends StatelessWidget {
+  const _HourPicker({
+    required this.label,
+    required this.hour,
+    required this.onChanged,
+  });
+
+  final String label;
+  final int hour;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) => DropdownButton<int>(
+        value: hour,
+        isExpanded: true,
+        hint: Text(label),
+        items: [
+          for (var h = 0; h < 24; h++)
+            DropdownMenuItem(
+                value: h, child: Text('$label ${h.toString().padLeft(2, '0')}:00')),
+        ],
+        onChanged: (h) => h == null ? null : onChanged(h),
+      );
 }
 
 class _SectionHeader extends StatelessWidget {
