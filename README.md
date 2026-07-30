@@ -13,7 +13,7 @@ built to run well on hardware everyone else has given up on.
 | **Any network device** (PC, NAS, printer, router, TV) | TCP sweep + ARP + mDNS + SSDP + NetBIOS names | Working |
 | **Security cameras, any brand** | ONVIF WS-Discovery, or a manual RTSP/HTTP URL | Working |
 | **Analog cameras** | The DVR/encoder's RTSP channel, added manually | Working |
-| **Home Assistant** | mDNS autodetect, REST + WebSocket | Planned |
+| **Home Assistant** | mDNS autodetect, REST + WebSocket | Working |
 | **MQTT devices** (ESP32, Tasmota, Zigbee2MQTT) | Broker connection, HA-discovery + Homie topics | Planned |
 | **Ancient devices** (pre-Android 5, old iPads) | Retro web dashboard served by the Go hub | Planned |
 
@@ -46,7 +46,7 @@ home_deck/
 ├── app/     Flutter app (Android + Linux)
 │   └── lib/
 │       ├── models/       Device, Camera
-│       ├── connectors/   netscan/, camera/  (one Connector interface per source)
+│       ├── connectors/   netscan/, camera/, ha/  (one Connector interface per source)
 │       ├── services/     device_registry, camera_store, settings_store, connectors_service
 │       ├── screens/      dashboard, devices, cameras, camera_view, settings, onboarding
 │       └── widgets/      device_tile, camera_tile, ptz_pad
@@ -54,8 +54,11 @@ home_deck/
 ```
 
 Connectors are the extension point: each one discovers devices, pushes them into
-the `DeviceRegistry`, and executes actions for the devices it owns. Adding
-Home Assistant or MQTT means adding a connector, not touching the UI.
+the `DeviceRegistry`, and executes actions for the devices it owns. Adding MQTT
+or the hub means adding a connector, not touching the UI.
+
+See [docs/home-assistant-setup.md](docs/home-assistant-setup.md) for connecting
+Home Assistant, including installing it if you don't run it yet.
 
 ## Building
 

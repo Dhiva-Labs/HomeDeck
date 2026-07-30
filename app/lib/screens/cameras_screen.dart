@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../connectors/camera/onvif_service.dart';
+import '../connectors/ha/ha_connector.dart';
 import '../models/camera.dart';
+import '../models/device.dart';
 import '../services/camera_store.dart';
 import '../services/device_registry.dart';
 import '../widgets/camera_tile.dart';
@@ -15,7 +17,15 @@ class CamerasScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final store = context.watch<CameraStore>();
-    final cameras = store.enabled;
+    // Home Assistant camera entities appear alongside directly-added cameras,
+    // so the wall is one list regardless of where a camera came from.
+    final haCameras = context
+        .watch<DeviceRegistry>()
+        .byConnector('ha')
+        .where((device) => device.kind == DeviceKind.camera)
+        .map(cameraFromDevice)
+        .nonNulls;
+    final cameras = [...store.enabled, ...haCameras];
 
     return Scaffold(
       appBar: AppBar(

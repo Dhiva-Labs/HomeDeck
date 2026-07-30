@@ -6,6 +6,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'package:media_kit/media_kit.dart';
 
+import 'connectors/ha/ha_connector.dart';
 import 'connectors/netscan/netscan_connector.dart';
 import 'screens/home_shell.dart';
 import 'screens/onboarding_screen.dart';
@@ -25,8 +26,12 @@ Future<void> main() async {
   final cameras = CameraStore();
   await cameras.load();
 
+  final ha = HaConnector(registry);
+  await ha.configure(baseUrl: settings.haUrl, token: settings.haToken);
+
   final connectors = ConnectorsService([
     NetscanConnector(registry),
+    ha,
   ]);
   unawaited(connectors.startAll());
 
@@ -66,6 +71,8 @@ class HomeDeckApp extends StatelessWidget {
         ChangeNotifierProvider.value(value: connectors),
         ChangeNotifierProvider.value(
             value: connectors.get<NetscanConnector>('netscan')!),
+        ChangeNotifierProvider.value(
+            value: connectors.get<HaConnector>('ha')!),
       ],
       child: Consumer<SettingsStore>(
         builder: (context, settings, _) => MaterialApp(

@@ -121,6 +121,8 @@ class DeviceDetailSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
+          if (device.can(DeviceCapability.brightness))
+            _BrightnessSlider(device: device),
           _ActionRow(device: device),
           const SizedBox(height: 16),
           DropdownMenu<String?>(
@@ -192,6 +194,51 @@ class DeviceDetailSheet extends StatelessWidget {
       ),
     );
     if (name != null && name.isNotEmpty) registry.rename(device.id, name);
+  }
+}
+
+/// Dim control for lights. Commits on release rather than on every frame so
+/// a drag doesn't flood Home Assistant with service calls.
+class _BrightnessSlider extends StatefulWidget {
+  const _BrightnessSlider({required this.device});
+
+  final Device device;
+
+  @override
+  State<_BrightnessSlider> createState() => _BrightnessSliderState();
+}
+
+class _BrightnessSliderState extends State<_BrightnessSlider> {
+  double? _dragging;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = _dragging ??
+        (widget.device.state['brightness'] as num?)?.toDouble() ??
+        0;
+
+    return Row(
+      children: [
+        const Icon(Icons.brightness_6_outlined),
+        Expanded(
+          child: Slider(
+            value: value.clamp(0, 100),
+            max: 100,
+            divisions: 20,
+            label: '${value.round()}%',
+            onChanged: (v) => setState(() => _dragging = v),
+            onChangeEnd: (v) {
+              setState(() => _dragging = null);
+              context.read<ConnectorsService>().invoke(
+                    widget.device,
+                    DeviceAction('set_brightness', {'value': v}),
+                  );
+            },
+          ),
+        ),
+        SizedBox(width: 44, child: Text('${value.round()}%')),
+      ],
+    );
   }
 }
 

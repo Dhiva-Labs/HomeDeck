@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import '../connectors/ha/ha_connector.dart';
 import '../services/device_registry.dart';
 import '../services/settings_store.dart';
+import 'ha_settings_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -12,6 +14,7 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsStore>();
     final registry = context.watch<DeviceRegistry>();
+    final ha = context.watch<HaConnector>();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -60,11 +63,19 @@ class SettingsScreen extends StatelessWidget {
           ),
           const Divider(),
           const _SectionHeader('Connections'),
-          const ListTile(
-            leading: Icon(Icons.home_outlined),
-            title: Text('Home Assistant'),
-            subtitle: Text('Arrives in the Home Assistant build'),
-            enabled: false,
+          ListTile(
+            leading: const Icon(Icons.home_outlined),
+            title: const Text('Home Assistant'),
+            subtitle: Text(ha.configured
+                ? (ha.statusMessage ?? ha.status.name)
+                : 'Not connected'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => const HaSettingsScreen(),
+              ),
+            ),
           ),
           const ListTile(
             leading: Icon(Icons.hub_outlined),
