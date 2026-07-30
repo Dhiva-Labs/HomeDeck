@@ -1,0 +1,35 @@
+name: home_deck
+description: "Unified home control panel — Home Assistant, IoT and network devices, and any security camera, optimized for repurposed old phones and tablets."
+publish_to: 'none'
+
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  provider: ^6.1.5
+  path_provider: ^2.1.6
+  shared_preferences: ^2.3.0
+  uuid: ^4.5.3
+  http: ^1.2.0
+  multicast_dns: ^0.3.2
+  wakelock_plus: ^1.2.0
+  url_launcher: ^6.3.0
+  media_kit: ^1.2.6
+  media_kit_video: ^2.0.1
+  media_kit_libs_video: ^1.0.7
+  easy_onvif: ^3.1.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

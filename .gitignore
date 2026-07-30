@@ -1,0 +1,75 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Debian build-time HOME and downloaded Flutter SDK, per debian/rules.
+# debian/rules clean removes these too, but keep them out of the working
+# tree in case a build was interrupted.
+/debian/.home/
+/.flutter/
+/debian/files
+
+# snapcraft build state (parts/stage/prime are each 500 MB+ of build cache)
+# and the packed snap itself, per snap/snapcraft.yaml.
+/parts/
+/stage/
+/prime/
+/*.snap
+
+# Vendored Flutter SDK + pub cache used by debian/rules to build the
+# PPA source package offline (see packaging/vendor/README for how to
+# reproduce them). Kept out of git because GitHub's per-file limit is
+# 100 MB and the Flutter tarball is 147 MB, and because these are
+# packaging inputs (regenerated on Flutter version bumps) rather than
+# source code the repo tracks history for.
+/packaging/vendor/*.tar.xz
+
+# dpkg-buildpackage / debhelper generated between clean and build. `debian/
+# rules clean` removes them, but keep them out of the working tree in case
+# a build was interrupted.
+/debian/.debhelper/
+/debian/debhelper-build-stamp
+/debian/secureshellgo/
+/debian/secureshellgo.substvars
