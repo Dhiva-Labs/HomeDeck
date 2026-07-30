@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<!--
+  Deliberately old-fashioned HTML.
+
+  This page is the only way in for devices Flutter cannot target: pre-Android-5
+  phones, iOS 6 iPads, e-readers, smart TVs. So: no framework, no flexbox, no
+  CSS variables, no ES6, no fetch. Tables for layout, inline styles, and a
+  meta refresh so the page stays current even with JavaScript switched off.
+
+  Camera feeds are plain <img> tags pointed at the hub's MJPEG endpoint, which
+  every browser ever shipped can render without a video codec.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="60">
+<title>HomeDeck</title>
+<style type="text/css">
+body {
+  margin: 0;
+  padding: 12px;
+  background: #101414;
+  color: #e6eceb;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 16px;
+}
+h1 { font-size: 20px; margin: 0 0 4px 0; }
+h2 { font-size: 16px; margin: 20px 0 8px 0; color: #4db6ac; font-weight: normal; }
+.clock { color: #7d8b89; font-size: 14px; margin-bottom: 8px; }
+table { width: 100%; border-collapse: collapse; }
+td { padding: 6px 4px; vertical-align: middle; border-bottom: 1px solid #223; }
+.cam { display: inline-block; width: 320px; margin: 0 8px 8px 0; vertical-align: top; }
+.cam img { width: 320px; height: 180px; background: #000; display: block; }
+.cam .label { padding: 6px; background: #1b2322; font-size: 14px; }
+.btn {
+  display: inline-block;
+  padding: 10px 14px;
+  background: #4db6ac;
+  color: #06201d;
+  text-decoration: none;
+  font-weight: bold;
+  border: 0;
+  font-size: 15px;
+}
+.dot { color: #59d38a; }
+.kind { color: #7d8b89; font-size: 13px; }
+.empty { color: #7d8b89; padding: 12px 0; }
+</style>
+</head>
+<body>
+
+<h1>HomeDeck</h1>
+<div class="clock">Updated {{.Now}} &middot; refreshes every minute</div>
+
+<h2>Cameras</h2>
+{{if .Cameras}}
+  {{range .Cameras}}
+  <div class="cam">
+    <img src="/stream/{{.ID}}" alt="{{.Name}}">
+    <div class="label">{{.Name}}{{if .Room}} &middot; {{.Room}}{{end}}</div>
+  </div>
+  {{end}}
+{{else}}
+  <div class="empty">No cameras configured yet.</div>
+{{end}}
+
+<h2>Devices on the network</h2>
+{{if .Hosts}}
+<table>
+  {{range .Hosts}}
+  <tr>
+    <td width="16"><span class="dot">&bull;</span></td>
+    <td>
+      {{if .Name}}{{.Name}}{{else}}{{.IP}}{{end}}
+      <div class="kind">{{.IP}}{{if .Kind}} &middot; {{.Kind}}{{end}}</div>
+    </td>
+    <td align="right">
+      {{if .MAC}}
+      <form method="post" action="/api/wake?mac={{.MAC}}" style="margin:0">
+        <input type="submit" class="btn" value="Wake">
+      </form>
+      {{end}}
+    </td>
+  </tr>
+  {{end}}
+</table>
+{{else}}
+<div class="empty">No devices found yet — the first scan may still be running.</div>
+{{end}}
+
+</body>
+</html>

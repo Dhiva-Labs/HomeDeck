@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../connectors/ha/ha_connector.dart';
+import '../connectors/hub/hub_connector.dart';
 import '../connectors/mqtt/mqtt_connector.dart';
 import '../services/device_registry.dart';
 import '../services/settings_store.dart';
@@ -18,6 +19,7 @@ class SettingsScreen extends StatelessWidget {
     final registry = context.watch<DeviceRegistry>();
     final ha = context.watch<HaConnector>();
     final mqtt = context.watch<MqttConnector>();
+    final hub = context.watch<HubConnector>();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -94,15 +96,61 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
           ),
-          const ListTile(
-            leading: Icon(Icons.dns_outlined),
-            title: Text('HomeDeck Hub'),
-            subtitle: Text('Arrives in the hub build'),
-            enabled: false,
+          ListTile(
+            leading: const Icon(Icons.dns_outlined),
+            title: const Text('HomeDeck Hub'),
+            subtitle: Text(hub.configured
+                ? (hub.statusMessage ?? hub.status.name)
+                : 'Optional — adds 24/7 scanning and camera transcoding'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _configureHub(context, hub),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _configureHub(BuildContext context, HubConnector hub) async {
+    final settings = context.read<SettingsStore>();
+    final controller = TextEditingController(text: hub.baseUrl ?? '');
+    final url = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('HomeDeck Hub'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'The hub is optional. It runs on a Pi or an always-on PC and '
+              'adds round-the-clock network scanning, more reliable '
+              'Wake-on-LAN, and camera transcoding for weak devices.',
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Hub address',
+                hintText: '192.168.0.50:8477',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, ''),
+            child: const Text('Disconnect'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (url == null) return;
+    settings.hubUrl = url;
+    await hub.configure(baseUrl: url);
   }
 
   Future<void> _addRoom(BuildContext context) async {

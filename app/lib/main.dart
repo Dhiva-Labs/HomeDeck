@@ -7,6 +7,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:media_kit/media_kit.dart';
 
 import 'connectors/ha/ha_connector.dart';
+import 'connectors/hub/hub_connector.dart';
 import 'connectors/mqtt/mqtt_connector.dart';
 import 'connectors/netscan/netscan_connector.dart';
 import 'screens/home_shell.dart';
@@ -38,10 +39,14 @@ Future<void> main() async {
     password: settings.mqttPassword,
   );
 
+  final hub = HubConnector(registry);
+  await hub.configure(baseUrl: settings.hubUrl);
+
   final connectors = ConnectorsService([
     NetscanConnector(registry),
     ha,
     mqtt,
+    hub,
   ]);
   unawaited(connectors.startAll());
 
@@ -85,6 +90,8 @@ class HomeDeckApp extends StatelessWidget {
             value: connectors.get<HaConnector>('ha')!),
         ChangeNotifierProvider.value(
             value: connectors.get<MqttConnector>('mqtt')!),
+        ChangeNotifierProvider.value(
+            value: connectors.get<HubConnector>('hub')!),
       ],
       child: Consumer<SettingsStore>(
         builder: (context, settings, _) => MaterialApp(
