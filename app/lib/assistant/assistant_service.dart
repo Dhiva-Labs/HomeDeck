@@ -35,10 +35,9 @@ class AssistantService extends ChangeNotifier {
     required this.registry,
     required this.nlu,
     required this.executor,
-    required SpeechRecognizer recognizer,
-    required SpeechSynthesizer synthesizer,
-  })  : _recognizer = recognizer,
-        _synthesizer = synthesizer;
+    required this._recognizer,
+    required this._synthesizer,
+  });
 
   final DeviceRegistry registry;
   final NluEngine nlu;
