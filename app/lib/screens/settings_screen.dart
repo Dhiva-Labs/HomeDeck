@@ -4,10 +4,13 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../connectors/ha/ha_connector.dart';
 import '../connectors/hub/hub_connector.dart';
+import '../connectors/hue/hue_connector.dart';
 import '../connectors/mqtt/mqtt_connector.dart';
 import '../services/device_registry.dart';
 import '../services/settings_store.dart';
+import 'assistant/voice_settings_route.dart';
 import 'ha_settings_screen.dart';
+import 'hue_settings_screen.dart';
 import 'mqtt_settings_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -20,6 +23,7 @@ class SettingsScreen extends StatelessWidget {
     final ha = context.watch<HaConnector>();
     final mqtt = context.watch<MqttConnector>();
     final hub = context.watch<HubConnector>();
+    final hue = context.watch<HueConnector>();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -119,6 +123,22 @@ class SettingsScreen extends StatelessWidget {
             onTap: () => _addRoom(context),
           ),
           const Divider(),
+          const _SectionHeader('Assistant'),
+          ListTile(
+            leading: const Icon(Icons.mic_none),
+            title: const Text('Voice assistant'),
+            subtitle: Text(settings.assistantEnabled
+                ? 'Listening for "${settings.wakeWord}"'
+                : 'Off — tap-to-talk still works from the mic button'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => const VoiceSettingsRoute(),
+              ),
+            ),
+          ),
+          const Divider(),
           const _SectionHeader('Connections'),
           ListTile(
             leading: const Icon(Icons.home_outlined),
@@ -145,6 +165,20 @@ class SettingsScreen extends StatelessWidget {
               context,
               MaterialPageRoute<void>(
                 builder: (_) => const MqttSettingsScreen(),
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.lightbulb_outline),
+            title: const Text('Philips Hue'),
+            subtitle: Text(hue.configured
+                ? (hue.statusMessage ?? hue.status.name)
+                : 'Local bridge — no cloud account'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => const HueSettingsScreen(),
               ),
             ),
           ),
