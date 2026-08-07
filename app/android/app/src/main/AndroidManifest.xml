@@ -5,6 +5,12 @@
     <!-- Multicast is needed for mDNS/SSDP discovery on Wi-Fi. -->
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <!-- Voice assistant: mic capture for wake-word + command listening
+         (Porcupine, sherpa-onnx KWS, speech_to_text all need this). -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- speech_to_text requires this on API 31+ so recognition can route
+         through a connected Bluetooth headset mic. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
     <application
         android:label="HomeDeck"
         android:name="${applicationName}"

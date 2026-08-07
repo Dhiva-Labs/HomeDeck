@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/assistant/assistant_fab.dart';
 import 'cameras_screen.dart';
 import 'dashboard_screen.dart';
 import 'devices_screen.dart';
@@ -26,6 +27,7 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(index: _index, children: _screens),
+      floatingActionButton: const AssistantFab(),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),

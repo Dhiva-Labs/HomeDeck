@@ -140,4 +140,81 @@ class SettingsStore extends ChangeNotifier {
         : _prefs.setString('hubUrl', v);
     notifyListeners();
   }
+
+  // ---- Philips Hue -----------------------------------------------------------
+
+  String? get hueBridgeIp => _prefs.getString('hueBridgeIp');
+  set hueBridgeIp(String? v) {
+    v == null || v.isEmpty
+        ? _prefs.remove('hueBridgeIp')
+        : _prefs.setString('hueBridgeIp', v);
+    notifyListeners();
+  }
+
+  String? get hueAppKey => _prefs.getString('hueAppKey');
+  set hueAppKey(String? v) {
+    v == null || v.isEmpty
+        ? _prefs.remove('hueAppKey')
+        : _prefs.setString('hueAppKey', v);
+    notifyListeners();
+  }
+
+  // ---- Voice assistant -------------------------------------------------------
+
+  /// Master switch for hotword listening. Tap-to-talk works regardless.
+  bool get assistantEnabled => _prefs.getBool('assistantEnabled') ?? false;
+  set assistantEnabled(bool v) {
+    _prefs.setBool('assistantEnabled', v);
+    notifyListeners();
+  }
+
+  /// "sherpa" (open, custom name typed as text) or "porcupine".
+  String get wakeEngine => _prefs.getString('wakeEngine') ?? 'sherpa';
+  set wakeEngine(String v) {
+    _prefs.setString('wakeEngine', v);
+    notifyListeners();
+  }
+
+  /// The custom wake name. For the sherpa engine this is the keyword text
+  /// itself; for Porcupine it selects a built-in keyword or names a .ppn.
+  String get wakeWord => _prefs.getString('wakeWord') ?? 'jarvis';
+  set wakeWord(String v) {
+    _prefs.setString('wakeWord', v);
+    notifyListeners();
+  }
+
+  /// Path to a custom-trained Porcupine .ppn model, if the user supplied one.
+  String? get porcupineKeywordPath => _prefs.getString('porcupineKeywordPath');
+  set porcupineKeywordPath(String? v) {
+    v == null || v.isEmpty
+        ? _prefs.remove('porcupineKeywordPath')
+        : _prefs.setString('porcupineKeywordPath', v);
+    notifyListeners();
+  }
+
+  String? get porcupineAccessKey => _prefs.getString('porcupineAccessKey');
+  set porcupineAccessKey(String? v) {
+    v == null || v.isEmpty
+        ? _prefs.remove('porcupineAccessKey')
+        : _prefs.setString('porcupineAccessKey', v);
+    notifyListeners();
+  }
+
+  double get wakeSensitivity => _prefs.getDouble('wakeSensitivity') ?? 0.5;
+  set wakeSensitivity(double v) {
+    _prefs.setDouble('wakeSensitivity', v);
+    notifyListeners();
+  }
+
+  bool get ttsEnabled => _prefs.getBool('ttsEnabled') ?? true;
+  set ttsEnabled(bool v) {
+    _prefs.setBool('ttsEnabled', v);
+    notifyListeners();
+  }
+
+  double get ttsVolume => _prefs.getDouble('ttsVolume') ?? 1.0;
+  set ttsVolume(double v) {
+    _prefs.setDouble('ttsVolume', v);
+    notifyListeners();
+  }
 }

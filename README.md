@@ -16,10 +16,37 @@ built to run well on hardware everyone else has given up on.
 | **Home Assistant** | mDNS autodetect, REST + WebSocket | Working |
 | **MQTT devices** (ESP32, Tasmota, Zigbee2MQTT, Shelly) | Broker connection, Home Assistant discovery topics | Working |
 | **Ancient devices** (pre-Android 5, old iPads) | Retro web dashboard served by the Go hub | Built, uncompiled |
+| **Philips Hue** | Local bridge, link-button pairing, CLIP v2 — no cloud account | Working |
+| **Google Home** | Home APIs platform channel; needs your own Developer Console registration | Scaffold — [docs/google-home-setup.md](docs/google-home-setup.md) |
+| **SmartThings / Tuya** | Through the Home Assistant bridge (their direct tokens expire in 24 h / trial windows) | Via HA |
+| **Alexa devices** | No public API lets a third-party app control a user's Alexa devices, by Amazon's design. Reach the same bulbs and plugs directly (Hue, MQTT) or through Home Assistant | Not possible directly |
 
 Devices from every source are normalized into one `Device` model, so the
 dashboard treats a Home Assistant light and a bare network host the same way:
 name it, put it in a room, act on it.
+
+## The voice assistant
+
+HomeDeck has a built-in assistant with a **custom wake name** — "Hey Jarvis",
+or whatever you type in — that controls every connected device. It is fully
+offline by design: a deterministic on-device grammar, no LLM, no API key, no
+cloud round-trip. If the internet is down, the lights still answer.
+
+- "turn off all the lights downstairs" / "kitchen light on" / "dim the desk
+  lamp" / "set the thermostat to 21" / "is the garage light on" / "wake the
+  computer" / "show me the front door camera"
+- Ambiguity comes back as a question — "Which one? Desk Lamp or Bedroom
+  Light?" — answered by voice, tap, or typing.
+- Two wake-word engines, switchable in Settings: **sherpa-onnx keyword
+  spotting** (open source, type any wake name) and **Picovoice Porcupine**
+  (higher accuracy; needs a free AccessKey from their console, and their
+  license only covers personal use for the free tier).
+- Speech-to-text prefers the platform's offline recognizer; replies are spoken
+  with the system TTS voice. Tap-to-talk and a typed command box work even
+  with the wake word off.
+
+What it deliberately does not do: chat, answer trivia, set timers, or send
+your audio anywhere. It is a device controller.
 
 ## Why it works on old hardware
 
