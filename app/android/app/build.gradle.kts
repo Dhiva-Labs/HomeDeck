@@ -63,6 +63,25 @@ kotlin {
     }
 }
 
+// The Google Home APIs SDK is only available to registered Home Developer
+// Console projects, so the code that calls it lives in src/homeapis and is
+// compiled only when `-PhomeApis` is passed (or homeApis= is set in
+// gradle.properties) AND the SDK has been dropped into app/libs/. Without
+// the flag every build works normally and GoogleHomeBridge falls back to
+// its "needs setup" facade. See docs/google-home-setup.md.
+if (project.hasProperty("homeApis")) {
+    android.sourceSets.getByName("main") {
+        kotlin.srcDir("src/homeapis/kotlin")
+    }
+    dependencies {
+        implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar", "*.jar"))))
+    }
+}
+
+dependencies {
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+}
+
 flutter {
     source = "../.."
 }

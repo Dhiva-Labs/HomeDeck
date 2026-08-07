@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -59,7 +60,9 @@ Future<void> main() async {
   );
 
   final ghome = GoogleHomeConnector(registry);
-  await ghome.configure(enabled: false); // needs Developer Console setup
+  // The native bridge exists on Android; until the one-time Developer
+  // Console setup is done it reports "needs setup" rather than devices.
+  await ghome.configure(enabled: Platform.isAndroid);
 
   final connectors = ConnectorsService([
     NetscanConnector(registry),

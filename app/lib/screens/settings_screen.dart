@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import '../connectors/connector.dart';
+import '../connectors/googlehome/googlehome_connector.dart';
 import '../connectors/ha/ha_connector.dart';
 import '../connectors/hub/hub_connector.dart';
 import '../connectors/hue/hue_connector.dart';
@@ -24,6 +27,7 @@ class SettingsScreen extends StatelessWidget {
     final mqtt = context.watch<MqttConnector>();
     final hub = context.watch<HubConnector>();
     final hue = context.watch<HueConnector>();
+    final ghome = context.watch<GoogleHomeConnector>();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -180,6 +184,20 @@ class SettingsScreen extends StatelessWidget {
               MaterialPageRoute<void>(
                 builder: (_) => const HueSettingsScreen(),
               ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.home_work_outlined),
+            title: const Text('Google Home'),
+            subtitle: Text(ghome.status == ConnectorStatus.connected
+                ? (ghome.statusMessage ?? 'Connected')
+                : (ghome.statusMessage ??
+                    'Needs one-time Developer Console setup')),
+            trailing: const Icon(Icons.open_in_new),
+            onTap: () => launchUrl(
+              Uri.parse(
+                  'https://github.com/Dhiva-Labs/HomeDeck/blob/main/docs/google-home-setup.md'),
+              mode: LaunchMode.externalApplication,
             ),
           ),
           ListTile(

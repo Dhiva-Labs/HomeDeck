@@ -206,3 +206,24 @@ are the full scope of the current work. `app/android/app/build.gradle`,
 `AndroidManifest.xml`, and any new Kotlin files are **not** created yet —
 they're the next, separate piece of work this document exists to hand off,
 per `app/lib/connectors/googlehome/INTEGRATION_NOTES.md`.
+
+## Activating the bundled Kotlin bridge (2026-08 update)
+
+The Kotlin half now exists in the repo — `GoogleHomeBridge` +
+`HomeApisFacade` are compiled into every build, and the SDK-specific
+implementation is pre-written at
+`app/android/app/src/homeapis/kotlin/.../HomeApisFacadeImpl.kt`.
+
+Until activation, Settings → Google Home shows "needs setup" and nothing
+else changes. To activate after the Developer Console registration:
+
+1. Download the Home APIs SDK offered by the console and drop the `.aar`
+   into `app/android/app/libs/`.
+2. Build with the flag: `flutter build apk --release --split-per-abi
+   --android-project-arg=homeApis` (or add `homeApis=` to
+   `app/android/gradle.properties`).
+3. Check `HomeApisFacadeImpl.kt`'s imports against the SDK version you
+   received — the beta has renamed packages before. Fix-ups belong in that
+   one file; nothing else references the SDK.
+4. Run the app, open Settings → Google Home: Google's consent sheet
+   appears once, then devices flow into the registry as `ghome:*`.
