@@ -1,0 +1,57 @@
+name: Release APKs
+
+# Tag a version (git tag v1.0.0 && git push --tags) and this signs and
+# publishes per-ABI APKs to a GitHub release. The keystore never lives in
+# the repo: it is rebuilt from repository secrets at run time.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Recreate signing config from secrets
+        run: |
+          mkdir -p android/keystore
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/keystore/homedeck-release.jks
+          cat > android/key.properties <<EOF
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=keystore/homedeck-release.jks
+          EOF
+
+      - run: flutter pub get
+      - run: flutter test
+      - run: flutter build apk --release --split-per-abi
+
+      - name: Rename artifacts
+        run: |
+          cd build/app/outputs/flutter-apk
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            mv "app-$abi-release.apk" "HomeDeck-${GITHUB_REF_NAME}-$abi.apk"
+          done
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/app/outputs/flutter-apk/HomeDeck-*.apk
+          generate_release_notes: true
