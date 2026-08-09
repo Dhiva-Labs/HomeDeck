@@ -2,6 +2,9 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        // Google Home APIs SDK (open beta) is hand-installed into ~/.m2 —
+        // see docs/google-home-setup.md.
+        mavenLocal()
     }
 }
 

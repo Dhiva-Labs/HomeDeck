@@ -39,9 +39,15 @@ jobs:
           storeFile=keystore/homedeck-release.jks
           EOF
 
+      - name: Install Google Home APIs SDK into mavenLocal
+        run: |
+          curl -sf -o /tmp/home_sdk.zip https://storage.googleapis.com/home_sdk_android/home.android.sdk_1_10_0.zip
+          mkdir -p ~/.m2/repository
+          unzip -o -q /tmp/home_sdk.zip -d ~/.m2/repository
+
       - run: flutter pub get
       - run: flutter test
-      - run: flutter build apk --release --split-per-abi
+      - run: flutter build apk --release --split-per-abi --android-project-arg=homeApis=true
 
       - name: Rename artifacts
         run: |

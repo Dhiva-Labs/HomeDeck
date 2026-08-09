@@ -1,53 +1,89 @@
 package com.dhivalabs.home_deck.homeapis
 
 import android.app.Activity
+import androidx.activity.result.ActivityResultCaller
 import com.dhivalabs.home_deck.HomeApisFacade
 import com.google.home.DeviceType
+import com.google.home.FactoryRegistry
 import com.google.home.Home
+import com.google.home.HomeClient
+import com.google.home.HomeConfig
 import com.google.home.HomeDevice
+import com.google.home.PermissionsResultStatus
+import com.google.home.PermissionsState
+import com.google.home.Trait
+import com.google.home.matter.standard.ColorTemperatureLightDevice
+import com.google.home.matter.standard.DimmableLightDevice
+import com.google.home.matter.standard.ExtendedColorLightDevice
 import com.google.home.matter.standard.LevelControl
+import com.google.home.matter.standard.LevelControlTrait
 import com.google.home.matter.standard.OnOff
 import com.google.home.matter.standard.OnOffLightDevice
+import com.google.home.matter.standard.OnOffLightSwitchDevice
 import com.google.home.matter.standard.OnOffPluginUnitDevice
 import com.google.home.matter.standard.Thermostat
+import com.google.home.matter.standard.ThermostatDevice
+import com.google.home.matter.standard.ThermostatTrait
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * The real Google Home APIs implementation. This file is compiled only when
- * the `homeApis` Gradle property is set (which also adds the SDK
- * dependency), i.e. only after the one-time Home Developer Console
- * registration is done and the SDK is available to this project.
+ * The real Google Home APIs implementation, written against SDK 17.1.0
+ * (signatures verified with javap against the downloaded artifacts, call
+ * shapes matched to Google's sample app). Compiled only when the `homeApis`
+ * Gradle property is set.
  *
- * NOTE: written against the Home APIs public-beta surface; when activating,
- * check the imports against the SDK version actually downloaded — Google
- * has renamed packages during the beta.
+ * Requires the host activity to be an AndroidX [ActivityResultCaller]
+ * (HomeDeck's MainActivity is a FlutterFragmentActivity), because the
+ * Permissions API drives Google's consent UI through activity results.
  */
 @Suppress("unused") // constructed by reflection from GoogleHomeBridge
-class HomeApisFacadeImpl(private val activity: Activity) : HomeApisFacade {
+class HomeApisFacadeImpl(activity: Activity) : HomeApisFacade {
 
-    private val home: Home by lazy { Home.getClient(activity) }
+    private val home: HomeClient = Home.getClient(
+        activity,
+        HomeConfig(
+            factoryRegistry = FactoryRegistry(
+                traits = listOf(OnOff, LevelControl, Thermostat),
+                types = listOf(
+                    OnOffLightDevice,
+                    DimmableLightDevice,
+                    ColorTemperatureLightDevice,
+                    ExtendedColorLightDevice,
+                    OnOffPluginUnitDevice,
+                    OnOffLightSwitchDevice,
+                    ThermostatDevice,
+                ),
+            ),
+        ),
+    ).also {
+        // Must happen during activity creation — Google's consent sheet is
+        // launched through the activity-result mechanism.
+        it.registerActivityResultCallerForPermissions(
+            activity as ActivityResultCaller)
+    }
 
     override suspend fun init(): Boolean {
-        // Triggers Google's account-picker + consent sheet on first run;
-        // afterwards it resolves silently.
-        val permissions = home.hasPermissions()
-        if (!permissions) {
-            home.requestPermissions(activity)
-            if (!home.hasPermissions()) return false
+        val state = home.hasPermissions().first()
+        if (state != PermissionsState.GRANTED) {
+            val result = home.requestPermissions()
+            if (result.status != PermissionsResultStatus.SUCCESS) return false
         }
-        return home.structures().first().isNotEmpty()
+        // Permission granted to a structure; give the first sync a moment.
+        return withTimeoutOrNull(10_000) {
+            home.structures().first { it.isNotEmpty() }
+        } != null
     }
 
     override suspend fun listDevices(): List<Map<String, Any?>> =
-        home.structures().first().flatMap { structure ->
-            structure.devices().first().map { device ->
-                mapOf(
-                    "id" to device.id.id,
-                    "name" to device.name,
-                    "type" to wireType(device),
-                    "state" to stateOf(device),
-                )
-            }
+        home.devices().first().map { device ->
+            val traits = traitsOf(device)
+            mapOf(
+                "id" to device.id.id,
+                "name" to device.name,
+                "type" to wireType(device, traits),
+                "state" to stateFrom(traits),
+            )
         }
 
     override suspend fun execute(
@@ -55,52 +91,72 @@ class HomeApisFacadeImpl(private val activity: Activity) : HomeApisFacade {
         action: String,
         args: Map<String, Any?>,
     ) {
-        val device = findDevice(deviceId)
+        val device = home.devices().first().firstOrNull { it.id.id == deviceId }
             ?: throw IllegalArgumentException("Unknown Google Home device $deviceId")
+        val traits = traitsOf(device)
+        val onOff = traits.filterIsInstance<OnOff>().firstOrNull()
+        val level = traits.filterIsInstance<LevelControl>().firstOrNull()
+        val thermostat = traits.filterIsInstance<Thermostat>().firstOrNull()
 
         when (action) {
-            "turn_on" -> device.trait(OnOff)?.on()
-            "turn_off" -> device.trait(OnOff)?.off()
-            "toggle" -> device.trait(OnOff)?.toggle()
+            "turn_on" -> onOff?.on()
+            "turn_off" -> onOff?.off()
+            "toggle" -> onOff?.toggle()
             "set_brightness" -> {
                 val percent = (args["value"] as? Number)?.toInt() ?: return
-                // Matter LevelControl is 0-254.
-                device.trait(LevelControl)
-                    ?.moveToLevel((percent * 254 / 100).toUByte())
+                level?.moveToLevelWithOnOff(
+                    level = (percent.coerceIn(0, 100) * 254 / 100).toUByte(),
+                    transitionTime = null,
+                    optionsMask = LevelControlTrait.OptionsBitmap(),
+                    optionsOverride = LevelControlTrait.OptionsBitmap(),
+                )
             }
             "set_temperature" -> {
-                val degrees = (args["value"] as? Number)?.toDouble() ?: return
-                // Matter thermostats take centidegrees.
-                device.trait(Thermostat)
-                    ?.setOccupiedHeatingSetpoint((degrees * 100).toInt().toShort())
+                val target = (args["value"] as? Number)?.toDouble() ?: return
+                val current = thermostat?.occupiedHeatingSetpoint ?: return
+                // setpointRaiseLower moves in 0.1 °C steps; attribute is in
+                // centidegrees.
+                val deciDelta = ((target * 100 - current) / 10).toInt()
+                thermostat.setpointRaiseLower(
+                    ThermostatTrait.SetpointRaiseLowerModeEnum.Both,
+                    deciDelta.coerceIn(-127, 127).toByte(),
+                )
             }
         }
     }
 
-    private suspend fun findDevice(id: String): HomeDevice? =
-        home.structures().first()
-            .flatMap { it.devices().first() }
-            .firstOrNull { it.id.id == id }
+    // ---- helpers -------------------------------------------------------------
 
-    private fun wireType(device: HomeDevice): String = when {
-        device.has(OnOffLightDevice) -> "light"
-        device.has(OnOffPluginUnitDevice) -> "outlet"
-        device.has(Thermostat) -> "thermostat"
-        device.has(OnOff) -> "switch"
-        else -> "unknown"
+    private suspend fun traitsOf(device: HomeDevice): List<Trait> =
+        device.types().first().flatMap { type -> type.traits() }
+
+    private suspend fun wireType(device: HomeDevice, traits: List<Trait>): String {
+        val types: Set<DeviceType> = device.types().first()
+        val factories = types.map { it.factory }
+        return when {
+            factories.any {
+                it == OnOffLightDevice || it == DimmableLightDevice ||
+                    it == ColorTemperatureLightDevice || it == ExtendedColorLightDevice
+            } -> "light"
+            factories.any { it == OnOffPluginUnitDevice } -> "outlet"
+            factories.any { it == ThermostatDevice } -> "thermostat"
+            traits.any { it is OnOff } -> "switch"
+            else -> "unknown"
+        }
     }
 
-    private suspend fun stateOf(device: HomeDevice): Map<String, Any?> {
+    private fun stateFrom(traits: List<Trait>): Map<String, Any?> {
         val state = mutableMapOf<String, Any?>()
-        device.trait(OnOff)?.let { state["on"] = it.onOff }
-        device.trait(LevelControl)?.currentLevel?.let {
+        traits.filterIsInstance<OnOff>().firstOrNull()?.onOff?.let {
+            state["on"] = it
+        }
+        traits.filterIsInstance<LevelControl>().firstOrNull()?.currentLevel?.let {
             state["brightness"] = it.toInt() * 100 / 254
         }
-        device.trait(Thermostat)?.occupiedHeatingSetpoint?.let {
-            state["value"] = it.toInt() / 100.0
-        }
+        traits.filterIsInstance<Thermostat>().firstOrNull()
+            ?.occupiedHeatingSetpoint?.let {
+                state["value"] = it.toInt() / 100.0
+            }
         return state
     }
-
-    private fun HomeDevice.has(type: DeviceType.Factory<*>) = types().contains(type)
 }

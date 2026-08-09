@@ -73,8 +73,14 @@ if (project.hasProperty("homeApis")) {
     android.sourceSets.getByName("main") {
         kotlin.srcDir("src/homeapis/kotlin")
     }
+    // The SDK zip from https://developers.home.google.com/apis/android/sdk
+    // is a maven repo layout — unzip it into ~/.m2/repository and these
+    // resolve from mavenLocal(). The SDK's own minSdk is 23.
+    android.defaultConfig.minSdk = maxOf(android.defaultConfig.minSdk ?: 23, 23)
     dependencies {
-        implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar", "*.jar"))))
+        implementation("com.google.android.gms:play-services-home:17.1.0")
+        implementation("com.google.android.gms:play-services-home-types:17.1.0")
+        implementation("androidx.activity:activity-ktx:1.9.3")
     }
 }
 

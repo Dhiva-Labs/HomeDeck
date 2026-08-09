@@ -73,3 +73,7 @@ app.*.map.json
 /debian/debhelper-build-stamp
 /debian/secureshellgo/
 /debian/secureshellgo.substvars
+
+# Google Home APIs SDK drop (re-downloadable; 184 MB, exceeds GitHub limits)
+/home.android.sdk_1_10_0.zip
+/*.sdk*.zip

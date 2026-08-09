@@ -30,14 +30,14 @@ class GoogleHomeBridge(private val activity: Activity) :
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-    private val facade: HomeApisFacade by lazy {
-        try {
-            Class.forName(HomeApisFacade.IMPL_CLASS)
-                .getConstructor(Activity::class.java)
-                .newInstance(activity) as HomeApisFacade
-        } catch (_: Throwable) {
-            UnavailableHomeApisFacade()
-        }
+    // Eager: the real implementation registers the permission-flow activity
+    // result caller, which must happen while the activity is being created.
+    private val facade: HomeApisFacade = try {
+        Class.forName(HomeApisFacade.IMPL_CLASS)
+            .getConstructor(Activity::class.java)
+            .newInstance(activity) as HomeApisFacade
+    } catch (_: Throwable) {
+        UnavailableHomeApisFacade()
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {

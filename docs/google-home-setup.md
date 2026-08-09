@@ -227,3 +227,14 @@ else changes. To activate after the Developer Console registration:
    one file; nothing else references the SDK.
 4. Run the app, open Settings → Google Home: Google's consent sheet
    appears once, then devices flow into the registry as `ghome:*`.
+
+## Status 2026-08-10: fully activated
+
+Console registration done (project `homedeck-03c8b`, Cloud project of the
+same id, Home API enabled, OAuth consent + test user, two Android OAuth
+clients for the release/debug SHA-1s). SDK 1.10.0 (play-services-home
+17.1.0) is installed into `~/.m2/repository`; local builds and the release
+workflow both build with `-PhomeApis=true`. `HomeApisFacadeImpl` is written
+against the real 17.1.0 surface (verified with javap + Google's sample
+app). MainActivity is a FlutterFragmentActivity because the Permissions
+API requires an AndroidX ActivityResultCaller.
