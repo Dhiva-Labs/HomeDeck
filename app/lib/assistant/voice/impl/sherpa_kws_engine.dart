@@ -90,7 +90,11 @@ class SherpaKwsWakeWordEngine implements WakeWordEngine {
 
     // Sensitivity (0-1, higher = more triggers) maps inversely onto
     // sherpa-onnx's per-keyword posterior threshold (lower = more triggers).
-    final threshold = (1.0 - sensitivity.clamp(0.0, 1.0)).clamp(0.05, 0.9);
+    // Anchored so the default 0.5 sensitivity lands on 0.25 — sherpa's own
+    // recommended threshold; the naive 1-sensitivity mapping made the
+    // spotter demand near-certainty and it almost never fired.
+    final s = sensitivity.clamp(0.0, 1.0);
+    final threshold = (0.45 - 0.4 * s).clamp(0.05, 0.45);
     if (!await _ensureSpotter(threshold)) return; // status already set
 
     final spotter = _spotter!;
