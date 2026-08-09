@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../assistant/assistant_boot.dart';
 import '../../assistant/assistant_service.dart';
+import '../../assistant/voice/impl/background_listening.dart';
 import '../../assistant/voice/impl/mic_permission.dart';
 import '../../services/settings_store.dart';
 import 'voice_settings_screen.dart';
@@ -45,6 +46,7 @@ class _VoiceSettingsRouteState extends State<VoiceSettingsRoute> {
             _mic = ok ? MicPermissionStatus.granted : MicPermissionStatus.denied);
       },
       onChanged: (next) {
+        final turningOn = next.assistantEnabled && !settings.assistantEnabled;
         settings
           ..assistantEnabled = next.assistantEnabled
           ..wakeEngine = next.wakeEngine == WakeEngineChoice.porcupine
@@ -58,6 +60,14 @@ class _VoiceSettingsRouteState extends State<VoiceSettingsRoute> {
         // Restart/stop the wake engine to match. Fire-and-forget: the
         // service reports through its own phase, not this screen.
         applyAssistantSettings(assistant, settings);
+        if (turningOn) {
+          // Screen-off listening survives OEM power managers only with the
+          // battery exemption; fire the system dialog once, the user
+          // decides there.
+          BackgroundListening.isBatteryExempt().then((exempt) {
+            if (!exempt) BackgroundListening.requestBatteryExemption();
+          });
+        }
       },
     );
   }

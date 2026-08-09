@@ -34,6 +34,10 @@ class MainActivity : FlutterFragmentActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             GoogleHomeBridge.CHANNEL,
         ).setMethodCallHandler(bridge)
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            BackgroundBridge.CHANNEL,
+        ).setMethodCallHandler(BackgroundBridge(this))
     }
 
     override fun onDestroy() {

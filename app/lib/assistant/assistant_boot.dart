@@ -3,6 +3,7 @@ import 'package:flutter/services.dart' show rootBundle;
 
 import '../services/settings_store.dart';
 import 'assistant_service.dart';
+import 'voice/impl/background_listening.dart';
 import 'voice/impl/keyword_encoder.dart';
 import 'voice/impl/mic_permission.dart';
 import 'voice/impl/porcupine_engine.dart';
@@ -22,6 +23,7 @@ Future<void> applyAssistantSettings(
   assistant.speakReplies = settings.ttsEnabled;
 
   if (!settings.assistantEnabled) {
+    await BackgroundListening.stop();
     await assistant.disable();
     return;
   }
@@ -64,10 +66,15 @@ Future<void> applyAssistantSettings(
       keywordAsset: keywordAsset,
       sensitivity: settings.wakeSensitivity,
     );
+    // Alexa mode: a microphone foreground service keeps this engine (and
+    // its mic stream) alive when the app leaves the screen or the phone
+    // locks. No-op off Android.
+    await BackgroundListening.start();
   } catch (e) {
     // A broken engine (missing model assets, bad key) must not take the app
     // down — the panel keeps working, tap-to-talk keeps working.
     debugPrint('assistant: wake engine failed to start: $e');
     await assistant.disable();
+    await BackgroundListening.stop();
   }
 }

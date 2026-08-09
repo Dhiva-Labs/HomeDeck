@@ -11,6 +11,12 @@
     <!-- speech_to_text requires this on API 31+ so recognition can route
          through a connected Bluetooth headset mic. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <!-- Alexa-style always-listening: a microphone foreground service keeps
+         the wake engine running with the screen off/locked. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
     <application
         android:label="HomeDeck"
         android:name="${applicationName}"
@@ -37,6 +43,12 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Keeps the Dart wake-word engine and mic stream alive while the
+             app is backgrounded or the phone is locked. -->
+        <service
+            android:name=".WakeWordService"
+            android:exported="false"
+            android:foregroundServiceType="microphone"/>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
