@@ -2,18 +2,22 @@ name: Release APKs
 
 # Tag a version (git tag v1.0.0 && git push --tags) and this signs and
 # publishes per-ABI APKs to a GitHub release. The keystore never lives in
-# the repo: it is rebuilt from repository secrets at run time.
+# the repo: it is rebuilt from repository secrets at run time. The Linux
+# desktop tarballs (x64 and arm64) are built by desktop.yml and attached to
+# the same release once the APK job has created it.
 
 on:
   push:
     tags: ['v*']
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: app
@@ -61,3 +65,47 @@ jobs:
         with:
           files: app/build/app/outputs/flutter-apk/HomeDeck-*.apk
           generate_release_notes: true
+
+  linux:
+    uses: ./.github/workflows/desktop.yml
+    with:
+      version: ${{ github.ref_name }}
+
+  linux-release:
+    name: Attach the Linux tarballs
+    needs: [build, linux]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: linux-*
+          path: assets
+          merge-multiple: true
+
+      - name: Check the tarballs
+        run: |
+          ls -l assets
+          for arch in x64 arm64; do
+            [ -f "assets/HomeDeck-${TAG}-linux-${arch}.tar.gz" ] || { echo "::error::missing HomeDeck-${TAG}-linux-${arch}.tar.gz"; exit 1; }
+          done
+          [ "$(ls assets | wc -l)" -eq 2 ]
+
+      # Assets already on the release are left alone.
+      - name: Upload to release ${{ github.ref_name }}
+        run: |
+          existing="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name')"
+          for f in assets/*; do
+            name="$(basename "$f")"
+            if printf '%s\n' "$existing" | grep -qxF -- "$name"; then
+              echo "skip $name (already on the release)"
+            else
+              echo "upload $name"
+              gh release upload "$TAG" "$f" --repo "$GITHUB_REPOSITORY"
+            fi
+          done
