@@ -1,5 +1,10 @@
 # HomeDeck
 
+[![Desktop builds](https://github.com/Dhiva-Labs/HomeDeck/actions/workflows/desktop.yml/badge.svg?branch=main)](https://github.com/Dhiva-Labs/HomeDeck/actions/workflows/desktop.yml)
+[![CI](https://github.com/Dhiva-Labs/HomeDeck/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Dhiva-Labs/HomeDeck/actions/workflows/ci.yml)
+![Linux x64 | arm64](https://img.shields.io/badge/Linux-x64%20%7C%20arm64-informational?logo=linux&logoColor=white)
+![Android arm64-v8a | armeabi-v7a | x86_64](https://img.shields.io/badge/Android-arm64--v8a%20%7C%20armeabi--v7a%20%7C%20x86__64-informational?logo=android&logoColor=white)
+
 **One control panel for your whole home — and a second life for that old phone or tablet.**
 
 HomeDeck connects to Home Assistant, to IoT devices directly, to plain network
@@ -91,6 +96,27 @@ or the hub means adding a connector, not touching the UI.
 See [docs/home-assistant-setup.md](docs/home-assistant-setup.md) for connecting
 Home Assistant, including installing it if you don't run it yet.
 
+## Install
+
+**Android:** every release carries per-ABI APKs (`HomeDeck-<version>-arm64-v8a.apk`,
+`-armeabi-v7a.apk`, `-x86_64.apk`).
+
+**Linux desktop (x64 and arm64):** releases carry `HomeDeck-<version>-linux-x64.tar.gz` and
+`HomeDeck-<version>-linux-arm64.tar.gz`. They are built on Ubuntu 24.04, so they need
+that release's libraries or newer: GTK 3, mpv's client library (video playback), and the
+`parecord` and `ffmpeg` tools that the `record` plugin shells out to for the microphone.
+
+```bash
+sudo apt install libgtk-3-0t64 libmpv2 libepoxy0 pulseaudio-utils ffmpeg
+tar -xzf HomeDeck-<version>-linux-arm64.tar.gz     # or ...-linux-x64.tar.gz
+./HomeDeck-<version>-linux-arm64/home_deck
+```
+
+On the Linux build the offline sherpa-onnx wake-word engine (prebuilt for x86_64 and
+aarch64) and the typed command box work. Porcupine, `speech_to_text` and `flutter_tts`
+have no Linux implementation in the plugins HomeDeck uses, on either architecture, so
+speech recognition and spoken replies are Android-only for now.
+
 ## Building
 
 ```bash
@@ -110,7 +136,10 @@ JDK:
 export JAVA_HOME=/snap/android-studio/current/jbr
 ```
 
-Linux desktop needs mpv's development headers for video playback:
+Linux desktop needs mpv's development headers for video playback. Flutter does not
+cross-compile Linux apps, so build on the architecture you want: a build on an arm64
+machine lands in `build/linux/arm64/release/bundle`, on x64 in `build/linux/x64/...`.
+CI builds, tests and smoke-runs both (`.github/workflows/desktop.yml`).
 
 ```bash
 sudo apt install libmpv-dev
