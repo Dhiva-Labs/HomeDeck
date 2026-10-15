@@ -1,0 +1,188 @@
+name: Desktop
+
+# Linux desktop builds of the Flutter app for x64 and arm64.
+#
+# Besides running on pushes and pull requests, this workflow is called from
+# release.yml (workflow_call), so a release ships exactly what CI built and
+# smoke-tested.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      version:
+        description: Version used in the tarball name (default is the pubspec version)
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  FLUTTER_VERSION: '3.44.6'
+
+jobs:
+  linux:
+    name: Linux ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+            elf_machine: x86-64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            elf_machine: ARM aarch64
+    defaults:
+      run:
+        working-directory: app
+    env:
+      BUNDLE: build/linux/${{ matrix.arch }}/release/bundle
+      ELF_MACHINE: ${{ matrix.elf_machine }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # libmpv-dev / libepoxy-dev: media_kit_video's CMake needs both.
+      # xvfb, xauth, xdotool, dbus-x11, imagemagick: the smoke run below.
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libstdc++-12-dev \
+            libmpv-dev libepoxy-dev \
+            libgl1-mesa-dri libegl1 \
+            file xvfb xauth xdotool dbus-x11 imagemagick
+
+      - name: Install Flutter ${{ env.FLUTTER_VERSION }}
+        run: |
+          git clone --depth 1 --branch "$FLUTTER_VERSION" \
+            https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Configure Flutter
+        run: |
+          uname -m
+          flutter config --no-analytics --enable-linux-desktop
+          flutter precache --linux
+          flutter --version
+          dart --version
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: Test
+        run: flutter test
+
+      - name: Build release
+        run: flutter build linux --release
+
+      - name: Assert every ELF file in the bundle is ${{ matrix.elf_machine }}
+        run: |
+          for f in home_deck lib/libapp.so lib/libflutter_linux_gtk.so \
+                   lib/libsherpa-onnx-c-api.so lib/libonnxruntime.so; do
+            [ -f "$BUNDLE/$f" ] || { echo "::error::missing $BUNDLE/$f"; exit 1; }
+          done
+          checked=0
+          bad=0
+          while IFS= read -r -d '' f; do
+            desc="$(file -b "$f")"
+            case "$desc" in ELF*) ;; *) continue ;; esac
+            echo "$f: $desc"
+            checked=$((checked + 1))
+            case "$desc" in
+              *"$ELF_MACHINE"*) ;;
+              *) echo "::error file=$f::not $ELF_MACHINE"; bad=1 ;;
+            esac
+          done < <(find "$BUNDLE" -type f -print0)
+          echo "checked $checked ELF files"
+          [ "$checked" -ge 5 ] && [ "$bad" -eq 0 ]
+
+      - name: Package tarball
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          VERSION="${INPUT_VERSION:-$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d+ -f1)}"
+          tool/build_tarball.sh dist "$VERSION"
+          ls -l dist
+          [ "$(ls dist | wc -l)" -eq 1 ]
+          [ -f "dist/HomeDeck-${VERSION}-linux-${{ matrix.arch }}.tar.gz" ]
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Unpack the tarball and check it
+        run: |
+          NAME="HomeDeck-${VERSION}-linux-${{ matrix.arch }}"
+          tar -xzf "dist/$NAME.tar.gz" -C "$RUNNER_TEMP"
+          echo "UNPACKED=$RUNNER_TEMP/$NAME" >> "$GITHUB_ENV"
+          file "$RUNNER_TEMP/$NAME/home_deck" | tee /dev/stderr | grep "$ELF_MACHINE"
+          ls "$RUNNER_TEMP/$NAME" "$RUNNER_TEMP/$NAME/lib"
+
+      # Proves the prebuilt sherpa-onnx and onnxruntime libraries run on this
+      # CPU: load them, open the bundled wake-word models and decode audio.
+      - name: Run the sherpa-onnx wake-word model from the tarball
+        run: LD_LIBRARY_PATH="$UNPACKED/lib" dart run tool/sherpa_probe.dart
+
+      # Launch the unpacked app under Xvfb. The native runner titles the window
+      # home_deck before any Dart code runs, so the window alone proves little.
+      # What proves the arm64 AOT snapshot ran: libapp.so is mapped into the
+      # process, libmpv is loaded, the process survives, and the window shows
+      # the Flutter-rendered first screen (a screenshot with many colours).
+      - name: Smoke-run the unpacked app (Xvfb)
+        timeout-minutes: 5
+        run: |
+          mkdir -p "$RUNNER_TEMP/shots"
+          cat > "$RUNNER_TEMP/smoke.sh" <<'EOF'
+          log="$RUNNER_TEMP/smoke.log"
+          shot="$RUNNER_TEMP/shots/home_deck-${ARCH}.png"
+          "$UNPACKED/home_deck" > "$log" 2>&1 &
+          pid=$!
+          for i in $(seq 1 90); do
+            if xdotool search --name 'home_deck|HomeDeck' > /dev/null 2>&1; then
+              echo "window is up after ${i}s"
+              sleep 10
+              kill -0 "$pid" || { echo "home_deck died after showing its window"; cat "$log"; exit 1; }
+              import -window root "$shot"
+              colours="$(identify -format %k "$shot")"
+              echo "screenshot has $colours distinct colours"
+              echo "--- mapped libraries"
+              awk '{print $6}' "/proc/$pid/maps" | grep -E 'libapp\.so|libmpv|libflutter_linux_gtk|libepoxy' | sort -u
+              grep -q 'libapp\.so' "/proc/$pid/maps" || { echo "libapp.so is not mapped"; cat "$log"; exit 1; }
+              grep -q 'libmpv' "/proc/$pid/maps" || { echo "libmpv is not mapped"; cat "$log"; exit 1; }
+              kill "$pid"
+              echo "--- app output"
+              cat "$log"
+              [ "$colours" -ge 20 ] || { echo "window looks blank"; exit 1; }
+              exit 0
+            fi
+            kill -0 "$pid" 2> /dev/null || { echo "home_deck exited early"; cat "$log"; exit 1; }
+            sleep 1
+          done
+          echo "no window after 90s"
+          cat "$log"
+          exit 1
+          EOF
+          ARCH='${{ matrix.arch }}' \
+            xvfb-run -a -s "-screen 0 1280x800x24" dbus-run-session -- bash "$RUNNER_TEMP/smoke.sh"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-${{ matrix.arch }}
+          path: app/dist/*.tar.gz
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: smoke-screenshot-${{ matrix.arch }}
+          path: ${{ runner.temp }}/shots/*.png
+          if-no-files-found: error
+          retention-days: 7
