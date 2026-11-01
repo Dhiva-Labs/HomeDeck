@@ -1,0 +1,55 @@
+# Flatpak manifest for HomeDeck.
+#
+# Like the .rpm, Arch package and AppImage, this repackages the installed
+# tree CI builds from the release tarball (packaging/linux-distros/
+# make-tree.sh), so the Flatpak ships the same binary as every other format
+# instead of a second build inside the sandbox. The workflow unpacks that
+# tree into packaging/flatpak/tree/ after packaging/linux-distros/
+# bundle-libmpv.sh added libmpv with its dependency chain (from Ubuntu
+# 24.04) under usr/lib/homedeck/lib/, and parecord and pactl (which the
+# wake-word recorder runs) under usr/lib/homedeck/tools/bin/. A Flathub
+# submission needs `tree` swapped for an archive source and libmpv built
+# from source against the runtime; see README.md in this directory.
+id: com.dhivalabs.home_deck
+runtime: org.gnome.Platform
+runtime-version: '51'
+sdk: org.gnome.Sdk
+command: homedeck
+finish-args:
+  # GTK needs a display socket; fallback-x11 covers X11-only desktops.
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  # GPU acceleration for Flutter's renderer and mpv's camera video.
+  - --device=dri
+  # Home Assistant, MQTT brokers, Hue bridges, cameras (RTSP/ONVIF) and the
+  # LAN scan (TCP sweep, ARP, mDNS, SSDP) are all on the network.
+  - --share=network
+  # Camera audio, and the microphone the wake word listens
+  # to (parecord records through PulseAudio).
+  - --socket=pulseaudio
+modules:
+  - name: homedeck
+    buildsystem: simple
+    build-options:
+      # Stripping the Flutter AOT snapshot (libapp.so) leaves an app that
+      # cannot start, and the Ubuntu libraries are stripped already.
+      no-debuginfo: true
+      strip: false
+    sources:
+      - type: dir
+        path: tree
+        dest: tree
+      - type: file
+        path: com.dhivalabs.home_deck.metainfo.xml
+    build-commands:
+      # Flutter finds lib/ and data/ next to its executable; the media_kit
+      # plugin's RUNPATH ($ORIGIN) finds the bundled libmpv. parecord and
+      # pactl go on PATH (/app/bin), where record_linux runs them.
+      - install -d /app/lib && cp -a tree/usr/lib/homedeck /app/lib/homedeck
+      - install -d /app/bin && ln -s ../lib/homedeck/home_deck /app/bin/homedeck
+      - for t in parecord pactl; do ln -s ../lib/homedeck/tools/bin/$t /app/bin/$t; done
+      - install -Dm644 tree/usr/share/applications/homedeck.desktop /app/share/applications/com.dhivalabs.home_deck.desktop
+      - desktop-file-edit --set-icon=com.dhivalabs.home_deck /app/share/applications/com.dhivalabs.home_deck.desktop
+      - install -Dm644 tree/usr/share/icons/hicolor/192x192/apps/homedeck.png /app/share/icons/hicolor/192x192/apps/com.dhivalabs.home_deck.png
+      - install -Dm644 com.dhivalabs.home_deck.metainfo.xml /app/share/metainfo/com.dhivalabs.home_deck.metainfo.xml

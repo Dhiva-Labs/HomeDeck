@@ -3,6 +3,7 @@
 [![Desktop builds](https://github.com/Dhiva-Labs/HomeDeck/actions/workflows/desktop.yml/badge.svg?branch=main)](https://github.com/Dhiva-Labs/HomeDeck/actions/workflows/desktop.yml)
 [![CI](https://github.com/Dhiva-Labs/HomeDeck/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Dhiva-Labs/HomeDeck/actions/workflows/ci.yml)
 ![Linux x64 | arm64](https://img.shields.io/badge/Linux-x64%20%7C%20arm64-informational?logo=linux&logoColor=white)
+![Linux: tarball | rpm | Arch | AppImage | Flatpak](https://img.shields.io/badge/Linux-tarball%20%7C%20rpm%20%7C%20Arch%20%7C%20AppImage%20%7C%20Flatpak-informational?logo=linux&logoColor=white)
 ![Android arm64-v8a | armeabi-v7a | x86_64](https://img.shields.io/badge/Android-arm64--v8a%20%7C%20armeabi--v7a%20%7C%20x86__64-informational?logo=android&logoColor=white)
 
 **One control panel for your whole home — and a second life for that old phone or tablet.**
@@ -111,6 +112,35 @@ sudo apt install libgtk-3-0t64 libmpv2 libepoxy0 pulseaudio-utils ffmpeg
 tar -xzf HomeDeck-<version>-linux-arm64.tar.gz     # or ...-linux-x64.tar.gz
 ./HomeDeck-<version>-linux-arm64/home_deck
 ```
+
+From the next release on, releases also carry packages for other distributions, for
+x86-64 (`x86_64`) and ARM64 (`aarch64`), all made from the same build as the tarball.
+CI installs each one on its distribution and starts the app there.
+
+| Distribution | Install |
+|---|---|
+| Fedora, RHEL/Rocky/Alma | `sudo dnf install ./homedeck-<version>-1.x86_64.rpm` |
+| openSUSE Tumbleweed | `sudo zypper install --allow-unsigned-rpm ./homedeck-<version>-1.x86_64.rpm` |
+| Arch, Manjaro, EndeavourOS | `sudo pacman -U ./homedeck-<version>-1-x86_64.pkg.tar.zst` |
+| Any distribution (AppImage) | `chmod +x HomeDeck-<version>-x86_64.AppImage && ./HomeDeck-<version>-x86_64.AppImage` |
+| Any distribution (Flatpak) | `flatpak install --user ./homedeck-<version>-x86_64.flatpak` |
+
+- The `.rpm` and the Arch package use the distribution's libmpv (Fedora `mpv-libs`,
+  openSUSE `libmpv2`, Arch `mpv`). The `.rpm` recommends `parecord`/`pactl` for the
+  wake word (dnf installs them with it); on Arch they come with `libpulse`.
+- The AppImage and the Flatpak carry libmpv with Ubuntu 24.04's ffmpeg and the rest of
+  its chain, plus `parecord` and `pactl`, so they need nothing beyond GTK 3 (AppImage)
+  or the GNOME runtime from Flathub (Flatpak:
+  `flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo`).
+  The Flatpak has network access and the PulseAudio socket (microphone and camera
+  audio). Inside it, the LAN scan has no `ip` command for the gateway lookup and falls
+  back to `/proc/net/arp`.
+- The `.rpm` is not signed, hence `--allow-unsigned-rpm` on openSUSE. It asks for the
+  glibc its files use, so dnf and zypper refuse a system that is too old; the AppImage
+  carries Ubuntu 24.04 libraries and needs glibc 2.39 or newer (Fedora 40+, openSUSE
+  Tumbleweed, current Arch).
+- An AUR recipe (`homedeck-bin`, PKGBUILD + .SRCINFO built from the release tarball)
+  is attached as `homedeck-bin-<version>-aur.tar.gz`; it is not on the AUR yet.
 
 On the Linux build the offline sherpa-onnx wake-word engine (prebuilt for x86_64 and
 aarch64) and the typed command box work. Porcupine, `speech_to_text` and `flutter_tts`

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=HomeDeck
+GenericName=Home Control Panel
+Comment=One control panel for Home Assistant, IoT and network devices, and security cameras
+Exec=homedeck
+Icon=homedeck
+Terminal=false
+Categories=Utility;Network;
+Keywords=home;smart home;home assistant;mqtt;hue;camera;onvif;rtsp;
+StartupWMClass=com.dhivalabs.home_deck

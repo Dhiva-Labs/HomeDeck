@@ -1,0 +1,46 @@
+# Maintainer: Dhiva Labs <dhivakar1010@gmail.com>
+#
+# AUR package. It repackages the Linux tarball from the GitHub release, so
+# Arch users run the same build as every other distribution, laid out as
+# packaging/linux-distros/make-tree.sh lays out the other packages.
+# packaging/arch/aur.sh renders this file for each release (version and
+# checksums) and checks it with makepkg; the rendered PKGBUILD and .SRCINFO
+# are what gets pushed to the AUR.
+pkgname=@NAME@-bin
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc='@SUMMARY@'
+arch=('x86_64' 'aarch64')
+url='@HOMEPAGE@'
+license=('@LICENSE@')
+depends=(@ARCH_DEPENDS@)
+optdepends=(@ARCH_OPTDEPENDS@)
+provides=('@NAME@')
+conflicts=('@NAME@')
+options=('!strip' '!debug')
+# The desktop file and the icon, from the repository at the release tag.
+source=(
+@SOURCES@
+)
+sha256sums=(
+@SHA256SUMS@
+)
+source_x86_64=("@RELEASE_URL@/@SRC_AMD64@")
+source_aarch64=("@RELEASE_URL@/@SRC_ARM64@")
+sha256sums_x86_64=('@SHA_AMD64@')
+sha256sums_aarch64=('@SHA_ARM64@')
+
+package() {
+  case "$CARCH" in
+    x86_64) bundle='@SRC_AMD64@' ;;
+    aarch64) bundle='@SRC_ARM64@' ;;
+  esac
+  install -d "$pkgdir/usr/lib/homedeck" "$pkgdir/usr/bin"
+  cp -a "${bundle%.tar.gz}/." "$pkgdir/usr/lib/homedeck/"
+  ln -s ../lib/homedeck/home_deck "$pkgdir/usr/bin/homedeck"
+  install -Dm644 "$pkgname-$pkgver-homedeck.desktop" "$pkgdir/usr/share/applications/homedeck.desktop"
+  install -Dm644 "$pkgname-$pkgver-ic_launcher.png" "$pkgdir/usr/share/icons/hicolor/192x192/apps/homedeck.png"
+  # Files the Arch package leaves out, as the one CI builds does
+  # (packaging/linux-distros/distro.conf upstream says why).
+  @REMOVE@
+}

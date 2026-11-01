@@ -3,8 +3,9 @@ name: Release APKs
 # Tag a version (git tag v1.0.0 && git push --tags) and this signs and
 # publishes per-ABI APKs to a GitHub release. The keystore never lives in
 # the repo: it is rebuilt from repository secrets at run time. The Linux
-# desktop tarballs (x64 and arm64) are built by desktop.yml and attached to
-# the same release once the APK job has created it.
+# desktop tarballs (x64 and arm64), and the .rpm, Arch package, AppImage,
+# Flatpak and AUR recipe made from them, are built and tested by desktop.yml
+# and attached to the same release once the APK job has created it.
 
 on:
   push:
@@ -72,7 +73,7 @@ jobs:
       version: ${{ github.ref_name }}
 
   linux-release:
-    name: Attach the Linux tarballs
+    name: Attach the Linux packages
     needs: [build, linux]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -88,13 +89,36 @@ jobs:
           path: assets
           merge-multiple: true
 
-      - name: Check the tarballs
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: distros-*
+          path: assets
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: aur
+          path: assets
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: flatpak-*
+          path: assets
+          merge-multiple: true
+
+      - name: Check the packages
         run: |
           ls -l assets
-          for arch in x64 arm64; do
-            [ -f "assets/HomeDeck-${TAG}-linux-${arch}.tar.gz" ] || { echo "::error::missing HomeDeck-${TAG}-linux-${arch}.tar.gz"; exit 1; }
+          v="${TAG#v}"
+          expected=("HomeDeck-${TAG}-linux-x64.tar.gz" "HomeDeck-${TAG}-linux-arm64.tar.gz" "homedeck-bin-${v}-aur.tar.gz")
+          for a in x86_64 aarch64; do
+            expected+=("homedeck-${v}-1.${a}.rpm" "homedeck-${v}-1-${a}.pkg.tar.zst"
+                       "HomeDeck-${v}-${a}.AppImage" "homedeck-${v}-${a}.flatpak")
           done
-          [ "$(ls assets | wc -l)" -eq 2 ]
+          for f in "${expected[@]}"; do
+            [ -f "assets/$f" ] || { echo "::error::missing $f"; exit 1; }
+          done
+          [ "$(ls assets | wc -l)" -eq "${#expected[@]}" ]
 
       # Assets already on the release are left alone.
       - name: Upload to release ${{ github.ref_name }}

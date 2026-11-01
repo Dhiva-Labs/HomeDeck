@@ -1,6 +1,11 @@
 name: Desktop
 
-# Linux desktop builds of the Flutter app for x64 and arm64.
+# Linux desktop builds of the Flutter app for x64 and arm64. The distros, aur
+# and flatpak jobs turn each tarball into an installed tree
+# (packaging/linux-distros/make-tree.sh) and package it for Fedora/RHEL/
+# openSUSE (.rpm), Arch (.pkg.tar.zst and the AUR PKGBUILD), any glibc
+# distribution (AppImage) and Flatpak, then install and run each one on the
+# real distribution.
 #
 # Besides running on pushes and pull requests, this workflow is called from
 # release.yml (workflow_call), so a release ships exactly what CI built and
@@ -137,42 +142,13 @@ jobs:
       # What proves the arm64 AOT snapshot ran: libapp.so is mapped into the
       # process, libmpv is loaded, the process survives, and the window shows
       # the Flutter-rendered first screen (a screenshot with many colours).
+      # The distros job runs the same script on Fedora, openSUSE and Arch.
       - name: Smoke-run the unpacked app (Xvfb)
         timeout-minutes: 5
         run: |
           mkdir -p "$RUNNER_TEMP/shots"
-          cat > "$RUNNER_TEMP/smoke.sh" <<'EOF'
-          log="$RUNNER_TEMP/smoke.log"
-          shot="$RUNNER_TEMP/shots/home_deck-${ARCH}.png"
-          "$UNPACKED/home_deck" > "$log" 2>&1 &
-          pid=$!
-          for i in $(seq 1 90); do
-            if xdotool search --name 'home_deck|HomeDeck' > /dev/null 2>&1; then
-              echo "window is up after ${i}s"
-              sleep 10
-              kill -0 "$pid" || { echo "home_deck died after showing its window"; cat "$log"; exit 1; }
-              import -window root "$shot"
-              colours="$(identify -format %k "$shot")"
-              echo "screenshot has $colours distinct colours"
-              echo "--- mapped libraries"
-              awk '{print $6}' "/proc/$pid/maps" | grep -E 'libapp\.so|libmpv|libflutter_linux_gtk|libepoxy' | sort -u
-              grep -q 'libapp\.so' "/proc/$pid/maps" || { echo "libapp.so is not mapped"; cat "$log"; exit 1; }
-              grep -q 'libmpv' "/proc/$pid/maps" || { echo "libmpv is not mapped"; cat "$log"; exit 1; }
-              kill "$pid"
-              echo "--- app output"
-              cat "$log"
-              [ "$colours" -ge 20 ] || { echo "window looks blank"; exit 1; }
-              exit 0
-            fi
-            kill -0 "$pid" 2> /dev/null || { echo "home_deck exited early"; cat "$log"; exit 1; }
-            sleep 1
-          done
-          echo "no window after 90s"
-          cat "$log"
-          exit 1
-          EOF
-          ARCH='${{ matrix.arch }}' \
-            xvfb-run -a -s "-screen 0 1280x800x24" dbus-run-session -- bash "$RUNNER_TEMP/smoke.sh"
+          xvfb-run -a -s "-screen 0 1280x800x24" dbus-run-session -- \
+            tool/smoke_linux.sh "$UNPACKED/home_deck" "$RUNNER_TEMP/shots/home_deck-${{ matrix.arch }}.png"
 
       - uses: actions/upload-artifact@v7
         with:
@@ -186,3 +162,174 @@ jobs:
           path: ${{ runner.temp }}/shots/*.png
           if-no-files-found: error
           retention-days: 7
+
+  # Builds the installed tree from each architecture's tarball and packages
+  # it for Fedora/RHEL/openSUSE (.rpm), Arch (.pkg.tar.zst) and any glibc
+  # distribution (AppImage), then installs every one of them on the real
+  # distribution and runs it. The .rpm and the Arch package use the
+  # distribution's libmpv; the AppImage (and the Flatpak, from the tree
+  # uploaded here) carry libmpv's whole dependency chain and parecord/pactl,
+  # copied from this runner by bundle-libmpv.sh.
+  distros:
+    name: Other distros ${{ matrix.arch }}
+    needs: [linux]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, deb_arch: amd64, runner: ubuntu-24.04 }
+          - { arch: arm64, deb_arch: arm64, runner: ubuntu-24.04-arm }
+    env:
+      NFPM_VERSION: '2.48.0'
+      APPIMAGETOOL_VERSION: '1.9.1'
+      INPUT_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: linux-${{ matrix.arch }}
+          path: tarball
+
+      # libmpv2 and pulseaudio-utils: what bundle-libmpv.sh copies (with
+      # their libraries) for the AppImage and the Flatpak. patchelf sets the
+      # RUNPATHs.
+      - name: Install nfpm, appimagetool, libmpv2, pulseaudio-utils and patchelf
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libmpv2 pulseaudio-utils patchelf
+          case "$(uname -m)" in
+            x86_64) nfpm_arch=x86_64; ai_arch=x86_64 ;;
+            aarch64) nfpm_arch=arm64; ai_arch=aarch64 ;;
+          esac
+          mkdir -p "$RUNNER_TEMP/bin"
+          cd "$RUNNER_TEMP/bin"
+          tarball="nfpm_${NFPM_VERSION}_Linux_${nfpm_arch}.tar.gz"
+          gh release download "v$NFPM_VERSION" -R goreleaser/nfpm -p "$tarball" -p checksums.txt
+          grep " $tarball\$" checksums.txt | sha256sum -c -
+          tar -xzf "$tarball" nfpm
+          gh release download "$APPIMAGETOOL_VERSION" -R AppImage/appimagetool \
+            -p "appimagetool-$ai_arch.AppImage" -O appimagetool
+          chmod +x appimagetool
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      # The tarball is named after the tag on release runs (HomeDeck-v1.1.0-...);
+      # package versions have no "v". TREE_TARBALL: the AppImage's tree, for
+      # the Flatpak job; tar keeps modes and symlinks, which a plain artifact
+      # upload would drop.
+      - name: Build .rpm, Arch package and AppImage
+        run: |
+          TARBALL_VERSION="${INPUT_VERSION:-$(grep '^version:' app/pubspec.yaml | awk '{print $2}' | cut -d+ -f1)}"
+          VERSION="${TARBALL_VERSION#v}"
+          packaging/linux-distros/make-tree.sh \
+            "tarball/HomeDeck-${TARBALL_VERSION}-linux-${{ matrix.arch }}.tar.gz" "$RUNNER_TEMP/root"
+          cp -a "$RUNNER_TEMP/root" "$RUNNER_TEMP/bundled"
+          packaging/linux-distros/bundle-libmpv.sh "$RUNNER_TEMP/bundled" usr/lib/homedeck/lib parecord pactl
+          VERSION="$VERSION" APPIMAGE_ROOT="$RUNNER_TEMP/bundled" TREE_TARBALL="$RUNNER_TEMP/tree.tar" \
+            packaging/linux-distros/pack.sh "$RUNNER_TEMP/root" ${{ matrix.deb_arch }} dist
+
+      - name: Install and run on Fedora, openSUSE and Arch
+        run: packaging/linux-distros/verify.sh dist ${{ matrix.deb_arch }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: distros-${{ matrix.arch }}
+          path: |
+            dist/*.rpm
+            dist/*.pkg.tar.zst
+            dist/*.AppImage
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: tree-${{ matrix.arch }}
+          path: ${{ runner.temp }}/tree.tar
+          if-no-files-found: error
+          retention-days: 3
+
+  # AUR recipe: PKGBUILD + .SRCINFO for homedeck-bin (from the release
+  # tarballs), rendered with this build's checksums and proven with makepkg
+  # on archlinux:latest.
+  aur:
+    name: AUR PKGBUILD
+    needs: [linux]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      INPUT_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: 'linux-*'
+          path: tarballs
+          merge-multiple: true
+
+      - name: Render and check the PKGBUILD
+        run: |
+          TARBALL_VERSION="${INPUT_VERSION:-$(grep '^version:' app/pubspec.yaml | awk '{print $2}' | cut -d+ -f1)}"
+          VERSION="${TARBALL_VERSION#v}" packaging/arch/aur.sh \
+            "tarballs/HomeDeck-${TARBALL_VERSION}-linux-x64.tar.gz" \
+            "tarballs/HomeDeck-${TARBALL_VERSION}-linux-arm64.tar.gz" dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: aur
+          path: dist/*-aur.tar.gz
+          if-no-files-found: error
+
+  # Builds the Flatpak bundle from the distros job's tree, installs it in the
+  # builder container and runs it there.
+  flatpak:
+    name: Flatpak ${{ matrix.arch }}
+    needs: [distros]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51
+      options: --privileged
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, fp_arch: x86_64, runner: ubuntu-24.04 }
+          - { arch: arm64, fp_arch: aarch64, runner: ubuntu-24.04-arm }
+    env:
+      INPUT_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: tree-${{ matrix.arch }}
+          path: ${{ runner.temp }}
+
+      - name: Unpack the installed tree
+        id: v
+        run: |
+          mkdir -p packaging/flatpak/tree
+          tar -xf "$RUNNER_TEMP/tree.tar" -C packaging/flatpak/tree
+          TARBALL_VERSION="${INPUT_VERSION:-$(grep '^version:' app/pubspec.yaml | awk '{print $2}' | cut -d+ -f1)}"
+          echo "version=${TARBALL_VERSION#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          manifest-path: packaging/flatpak/com.dhivalabs.home_deck.yml
+          bundle: homedeck-${{ steps.v.outputs.version }}-${{ matrix.fp_arch }}.flatpak
+          arch: ${{ matrix.fp_arch }}
+          artifact-name: flatpak-${{ matrix.arch }}
+          cache: false
+
+      - name: Install the bundle and run it
+        env:
+          SANDBOX_TOOLS: ip xdg-open
+          SANDBOX_TEST: packaging/flatpak/check-tools.sh
+        run: |
+          packaging/flatpak/test-bundle.sh \
+            homedeck-${{ steps.v.outputs.version }}-${{ matrix.fp_arch }}.flatpak \
+            com.dhivalabs.home_deck '^(home_deck|HomeDeck)$'
