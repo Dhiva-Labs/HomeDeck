@@ -77,3 +77,6 @@ app.*.map.json
 # Google Home APIs SDK drop (re-downloadable; 184 MB, exceeds GitHub limits)
 /home.android.sdk_1_10_0.zip
 /*.sdk*.zip
+
+# Flatpak build input, unpacked by CI (packaging/flatpak/README.md)
+/packaging/flatpak/tree/

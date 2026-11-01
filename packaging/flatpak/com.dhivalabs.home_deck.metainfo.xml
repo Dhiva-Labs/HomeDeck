@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.dhivalabs.home_deck</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LicenseRef-proprietary</project_license>
+  <name>HomeDeck</name>
+  <summary>Home control panel for Home Assistant, IoT and network devices, and cameras</summary>
+  <description>
+    <p>HomeDeck connects to Home Assistant, to IoT devices directly (MQTT, Philips Hue), to plain network devices that are not smart at all, and to security cameras of any brand (ONVIF, RTSP).</p>
+    <p>Its voice assistant answers to a wake name you choose and is fully offline: a deterministic on-device grammar, no cloud round-trip.</p>
+  </description>
+  <launchable type="desktop-id">com.dhivalabs.home_deck.desktop</launchable>
+  <url type="homepage">https://github.com/Dhiva-Labs/HomeDeck</url>
+  <url type="bugtracker">https://github.com/Dhiva-Labs/HomeDeck/issues</url>
+  <developer id="com.dhivalabs">
+    <name>Dhiva Labs</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="1.0.1" date="2026-08-07"/>
+  </releases>
+</component>
