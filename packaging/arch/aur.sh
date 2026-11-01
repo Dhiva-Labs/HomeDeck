@@ -64,7 +64,11 @@ printf '%s\n' "$pkgbuild" > "$work/PKGBUILD"
 cp "$src_amd64" "$work/"
 if grep -n '@[A-Z0-9_]*@' "$work/PKGBUILD"; then echo "unfilled placeholder" >&2; exit 1; fi
 
-docker run --rm -v "$work:/build" archlinux:latest bash -euo pipefail -c '
+# makepkg refuses to run as root, so the build runs as a user made in the
+# container; /build goes back to the runner's user at the end, or the tar
+# below (and the cleanup) cannot read what makepkg wrote.
+docker run --rm -v "$work:/build" -e HOST_IDS="$(id -u):$(id -g)" archlinux:latest bash -euo pipefail -c '
+  trap "chown -R \"\$HOST_IDS\" /build" EXIT
   pacman -Syu --noconfirm --needed -q base-devel namcap
   useradd -m builder
   chown -R builder /build
@@ -73,13 +77,21 @@ docker run --rm -v "$work:/build" archlinux:latest bash -euo pipefail -c '
   su builder -c "makepkg --noconfirm --nodeps -f"
   namcap PKGBUILD
   pacman -U --noconfirm ./*-x86_64.pkg.tar.zst
-  # Every ELF file the package installed finds its libraries on Arch.
+  # Every ELF file the package installed finds its libraries on Arch. The
+  # library directories of the package go on LD_LIBRARY_PATH, as the RUNPATH
+  # of the executable supplies them at run time (Flutter plugins need
+  # libflutter_linux_gtk.so from there, but keep the RUNPATH of the build
+  # machine).
+  files="$(pacman -Qlq "$(sed -n "s/^pkgname = //p" .SRCINFO)")"
+  libdirs="$(for f in $files; do
+    case "$f" in *.so|*.so.*) if [ -f "$f" ]; then dirname "$f"; fi ;; esac
+  done | sort -u | paste -sd:)"
   missing=0 n=0
-  for f in $(pacman -Qlq "$(sed -n "s/^pkgname = //p" .SRCINFO)"); do
+  for f in $files; do
     [ -f "$f" ] && [ ! -L "$f" ] || continue
     [ "$(head -c 4 "$f" | od -An -tx1 | tr -d " \n")" = 7f454c46 ] || continue
     n=$((n + 1))
-    if ldd "$f" | grep "not found"; then echo "^ $f"; missing=1; fi
+    if LD_LIBRARY_PATH="$libdirs" ldd "$f" 2>&1 | grep "not found"; then echo "^ $f"; missing=1; fi
   done
   echo "$n ELF files checked"
   [ "$n" -gt 0 ] && [ "$missing" = 0 ]
