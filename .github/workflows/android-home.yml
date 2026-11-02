@@ -1,0 +1,64 @@
+name: Android (Google Home)
+
+# Builds the Android APKs the way release.yml does, with the Google Home APIs
+# SDK (-PhomeApis), but signed with the debug key. A change that breaks the SDK
+# download or the code in app/android/app/src/homeapis shows up on the pull
+# request instead of on a release tag, which cannot be run ahead of time.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/android/**'
+      - 'app/pubspec.yaml'
+      - 'app/tool/install_home_sdk.sh'
+      - '.github/workflows/android-home.yml'
+      - '.github/workflows/release.yml'
+  pull_request:
+    paths:
+      - 'app/android/**'
+      - 'app/pubspec.yaml'
+      - 'app/tool/install_home_sdk.sh'
+      - '.github/workflows/android-home.yml'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  apk:
+    name: Release APKs with Google Home
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Google Home APIs SDK into mavenLocal
+        run: tool/install_home_sdk.sh
+
+      - run: flutter pub get
+      - run: flutter build apk --release --split-per-abi --android-project-arg=homeApis=true
+
+      - name: Check the APKs
+        run: |
+          ls -l build/app/outputs/flutter-apk
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            [ -s "build/app/outputs/flutter-apk/app-$abi-release.apk" ] \
+              || { echo "::error::missing app-$abi-release.apk"; exit 1; }
+          done
