@@ -8,6 +8,8 @@
 
 **One control panel for your whole home — and a second life for that old phone or tablet.**
 
+**Documentation:** step-by-step guides at [learn.dhivalabs.com](https://learn.dhivalabs.com/apps/homedeck/): [install](https://learn.dhivalabs.com/apps/homedeck/install) · [beginner guide](https://learn.dhivalabs.com/apps/homedeck/getting-started) · [troubleshooting](https://learn.dhivalabs.com/apps/homedeck/faq).
+
 HomeDeck connects to Home Assistant, to IoT devices directly, to plain network
 devices that aren't "smart" at all, and to security cameras of any brand. It is
 built to run well on hardware everyone else has given up on.
